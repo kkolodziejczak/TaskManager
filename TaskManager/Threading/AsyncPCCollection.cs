@@ -2,7 +2,7 @@
 
 namespace TaskManager.Threading
 {
-    public class AsyncPCCollection<T> : IAsyncProducer<T>, IAsyncConsumer<T>, IDisposable
+    public class AsyncPCCollection<T> : IAsyncProducer<T>, IAsyncConsumer<T>
         where T : class
     {
         private readonly Queue<T> _items;
@@ -10,7 +10,6 @@ namespace TaskManager.Threading
         private uint _totalConsumed;
         private uint _totalProduced;
         private bool _finished;
-
 
         public AsyncPCCollection()
             : this(Array.Empty<T>())
@@ -27,12 +26,17 @@ namespace TaskManager.Threading
             }
         }
 
+        ~AsyncPCCollection()
+        {
+            _semaphore.Dispose();
+        }
+        
         public async Task<T?> GetAsync()
         {
             try
             {
                 await _semaphore.WaitAsync();
-                if (_items.IsNotEmpty() && !_finished)
+                if (_items.IsNotEmpty())
                 {
                     var item = _items.Dequeue();
                     _totalConsumed++;
@@ -52,10 +56,11 @@ namespace TaskManager.Threading
             try
             {
                 await _semaphore.WaitAsync();
-                if (_items.IsNotEmpty() && !_finished)
+                if (_items.IsNotEmpty())
                 {
-                    var items = new T[_items.Count];
-                    for (var i = 0; i < _items.Count; i++)
+                    var itemsToReturn = _items.Count;
+                    var items = new T[itemsToReturn];
+                    for (var i = 0; i < itemsToReturn; i++)
                     {
                         items[i] = _items.Dequeue();
                         _totalConsumed++;
@@ -65,6 +70,32 @@ namespace TaskManager.Threading
                 }
 
                 return null;
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        public async Task<bool> IsEmptyAsync()
+        {
+            try
+            {
+                await _semaphore.WaitAsync();
+                return _items.IsEmpty();
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        public async Task<bool> IsFinishedAsync()
+        {
+            try
+            {
+                await _semaphore.WaitAsync();
+                return _finished;
             }
             finally
             {
@@ -132,11 +163,11 @@ namespace TaskManager.Threading
             }
         }
 
-        public async Task<bool> IsFinishedAndEmptyAsync(CancellationToken token)
+        public async Task<bool> IsFinishedAndEmptyAsync()
         {
             try
             {
-                await _semaphore.WaitAsync(token);
+                await _semaphore.WaitAsync();
                 return _finished && _items.IsEmpty();
             }
             finally
@@ -158,10 +189,5 @@ namespace TaskManager.Threading
             }
         }
 
-        public void Dispose()
-        {
-            FinishAsync().GetAwaiter().GetResult();
-            _semaphore.Dispose();
-        }
     }
 }

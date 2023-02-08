@@ -4,7 +4,9 @@
     {
         Task<T?> GetAsync();
         Task<IEnumerable<T>?> GetAllAsync();
-        Task<bool> IsFinishedAndEmptyAsync(CancellationToken token);
+        Task<bool> IsFinishedAndEmptyAsync();
+        Task<bool> IsEmptyAsync();
+        Task<bool> IsFinishedAsync();
         Task<uint> GetConsumedCountAsync();
     }
 }
